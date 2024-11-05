@@ -25,6 +25,7 @@ class Database {
                 Database.file_names.push(file); // This will push the name of each file to result array
             });
         });
+        console.log("Database files' names: ", Database.file_names);
         Database.instance = this;
     }
 
@@ -35,6 +36,8 @@ class Database {
         }
         return Database.instance; // Return the singleton instance
     }
+
+
 }
 
 // Export
