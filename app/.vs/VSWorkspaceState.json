@@ -1,10 +1,16 @@
 {
   "ExpandedNodes": [
     "",
+    "\\bin",
     "\\config",
+    "\\controllers",
+    "\\data",
+    "\\data\\data_file",
+    "\\models",
+    "\\public",
     "\\routes",
     "\\views"
   ],
-  "SelectedNode": "\\config\\db.js",
+  "SelectedNode": "\\bin\\www",
   "PreviewInSolutionExplorer": false
 }

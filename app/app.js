@@ -8,11 +8,20 @@ var lessMiddleware = require('less-middleware');
 var logger = require('morgan');
 
 // Database connect
-var dbConnection = new Database(path.join(__dirname, process.env.DATA_DIR));
+(async () => {
+    const db = await new Database(path.join(__dirname, process.env.DATA_DIR));
+    if (db) {
+        console.log("Database is loaded from folder: ", Database.getDataFolderDir());
+        // Perform other actions with the initialized instance
+    } else {
+        console.log("Failed to initialize the Database.");
+    }
+})();
 
-// Reuire Routers
+// Require Routers
 var indexRouter = require('./routes/index');
-var usersRouter = require('./routes/userRouter');
+var filesRouter = require('./routes/filesRouter');
+var databaseRouter = require('./routes/databaseRouter');
 
 // Site entry point
 const config = require('./config')();
@@ -33,10 +42,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Register Routers
 app.use('/', indexRouter);
-app.use('/users', usersRouter);
-
-// Resgiter API Endpoint
-/*... TODO ...*/
+app.use('/files', filesRouter);
+app.use('/database', databaseRouter);
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {

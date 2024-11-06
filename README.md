@@ -10,7 +10,7 @@ A website that helps you search bank statements quickly
 ## Database
 
 ### Approach
-- Implement File-based database - An singleton object that serve as a database across all modules
+- Implement File-based database - A Singleton object that serves as a database across all modules
 - The size of ```*csv``` file is enormous and we will conduct load/stress tests, so reading the entire file to RAM for query is not a good choice. The best option is to create a streamline to read ```*cvs``` file.
 - For random Access line or cell, we build Offset Index mechanism for each file then run this inside constructor.
 
@@ -83,4 +83,114 @@ A website that helps you search bank statements quickly
 	        return index;
 	}
 	```
+
+### Database
+- A singleton object that serves as a database across all modules
+- Implements in ```/config/db.js```:
+	```javascript
+	class Database {
+
+	    static instance;
+
+	    constructor(folder_path) {
+	        if (Database.instance) {
+	            return Database.instance; // Return existing instance if it exists
+	        }
+
+	        Database.folder_path = folder_path;
+	        Database.files = []; // Initialize files array
+
+	        // Initialize the database and return a promise
+	        this.initialize().then(() => {
+	            //console.log("Files' names: ", Database.file_names);
+	        }).catch(err => {
+	            console.error('Error during initialization:', err);
+	        });
+
+	        Database.instance = this; // Set singleton instance
+	    }
+
+	    async initialize() {
+	        try {
+	            const files = await fs.readdir(Database.folder_path); // Read directory contents
+
+	            // Initialize file_names as an empty array
+	            Database.file_names = [];
+	
+	            // Use Promise.all to create File instances and push file names
+	            Database.files = await Promise.all(
+	                files.map(file => {
+	                    Database.file_names.push(file); // Push file name to the array
+	                    return new File(`${Database.folder_path}/${file}`); // Create and return a new File instance
+	                })
+	            );
+	        } catch (err) {
+	            console.error('Unable to scan directory:', err);
+	            throw err; // Re-throw the error to be caught in the constructor
+	        }
+	    }
+
+
+	    // Static method to get the instance
+	    static getInstance(folder_path) {
+	        if (!Database.instance) {
+	            Database.instance = new Database(folder_path); // Create the instance if it doesn't exist
+	        }
+	        return Database.instance; // Return the singleton instance
+	    }
+
+	    /**
+	     * Get the Data Folder directory
+	     * 
+	     * @return {string} Data folder of this file-based database
+	     */
+	    static getDataFolderDir() {/*...*/}
+
+	    /**
+	     * Get the name of file that have ID = fileId
+	     * 
+	     * @param {number} fileId
+	     * @return {string} Name of file that has ID = fileId
+	     */
+	    static getFileName(fileId) {/*...*/}
+
+	    /**
+	     * Get the name of all file in the Database
+	     * 
+	     * @return {Array<string>} Name of file that has ID = fileId
+	     */
+	    static getAllFileName() {/*...*/}
+
+	    /**
+	     * return File object that hass ID = fileId
+	     * 
+	     * @param {number} fileId
+	     * @returns {File} File object that has ID = fileID
+	     */
+	    static getFile(fileId) {/*...*/}
+	```
+
+
+## Appendix
+
+### Install dependencies
+```
+npm install
+```
+
+### Start app
+```
+npm start
+```
+
+### Kill process (server) running on specific port:
+- Find PID of server running on port:
+	```
+	netstat -ano | findstr :<Port number>
+	```
+- Kill that process:
+	```
+	taskkill /F /PID <PID>
+	```
+
 

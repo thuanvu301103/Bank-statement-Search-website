@@ -1,13 +1,44 @@
 const fs = require('fs');
+const readline = require('readline');
 
 class File {
 
-    file_path = "";
-    offset_index = null;
+    #filePath;
+    #tableOffsetIndex = null;
+    #columnName = [];
+    #size = {};
 
-    constructor(file_path) {
-        this.file_path = file_path;
-        this.offset_index = this.buildOffsetIndex();
+    constructor(filePath) {
+        this.#filePath = filePath;
+        // Initialize offset_index using the async method
+        this.#tableOffsetIndex = this.#initialize(); // This will be a promise
+    }
+
+    async #initialize() {
+        // Call buildOffsetIndex and await its result
+        this.#tableOffsetIndex = await this.#buildOffsetIndex();
+        return this.#tableOffsetIndex; // Return the populated index
+    }
+
+    #formatString(data) {
+        data = data.trim();
+        if (data.startsWith('"') && data.endsWith('"')) {
+            data = data.slice(1, -1);
+        }
+        data.replace(/""/g, '"');
+        return data;
+    }
+
+    #findAllIndices(str, subStr) {
+        let indices = [];
+        let index = str.indexOf(subStr); // Find the first occurrence
+
+        while (index !== -1) {
+            indices.push(index); // Store the index
+            index = str.indexOf(subStr, index + subStr.length -1); // Find next occurrence starting from the next position
+        }
+
+        return indices;
     }
 
     /**
@@ -18,67 +49,419 @@ class File {
      *   A promise that resolves to an array of objects, each representing a line's starting byte offset
      *   and the byte offsets for each column within that line.
      */
-    async buildOffsetIndex(delimiter = ',') {
+    async #buildOffsetIndex(delimiter = ',') {
         const index = [];
-        const fileStream = fs.createReadStream(this.file_path);
-        // Read lines
+        const fileStream = fs.createReadStream(this.#filePath);
+        fileStream.setEncoding('utf8'); // Set encoding to UTF-8 for string data
+
         const rl = readline.createInterface({
             input: fileStream,
             crlfDelay: Infinity
         });
 
         let byteOffset = 0;
-
+        let isHeader = true;
         for await (const line of rl) {
-            const columnOffsets = [];
-            let currentColumnOffset = byteOffset; // Start with the line's byte offset
+            const cellOffsets = [];
+            let inQuotes = false;
+            let startByteOffset = byteOffset; // Track the starting byte offset for the line
+            //console.log("Line: ", line);
+            let cellContent = '';
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                //console.log(i, '=', char, " - Byte Lenght: ", Buffer.byteLength(char), " - Cell Lenght: ", Buffer.byteLength(cellContent));
+                cellContent += char;
 
-            // Calculate offsets for each column
-            line.split(delimiter).forEach((column) => {
-                columnOffsets.push(currentColumnOffset);
-                currentColumnOffset += Buffer.byteLength(column, 'utf8') + Buffer.byteLength(delimiter); // Update for each column
-            });
+                // Toggle the inQuotes state on encountering an unescaped quote
+                //if (char === '"' && (i === 0 || line[i - 1] !== '\\')) {
+                if (char === '"') {
+                    inQuotes = !inQuotes;
+                    //console.log("InQoute: ", inQuotes);
+                    continue;
+                }
 
-            index.push({
-                lineOffset: byteOffset,    // Starting byte offset of the line
-                columnOffsets: columnOffsets // Byte offsets for each column in the line
-            });
+                // Check if we've hit a delimiter and we're not in quotes
+                if (char === delimiter && !inQuotes) {
+                    // Push the start and end offsets for the current cell
+                    const endByteOffset = startByteOffset + Buffer.byteLength(cellContent) - Buffer.byteLength(delimiter) -1;
+                    //console.log("end: ", endByteOffset, " - ByteOffset: ", byteOffset, " - startByteOffset: ", startByteOffset, "- cellLenght: ", Buffer.byteLength(cellContent));
+                    cellOffsets.push({ start: startByteOffset, end: endByteOffset });
 
-            byteOffset += Buffer.byteLength(line, 'utf8') + 1; // Update for next line (+1 for newline)
+                    // If isHeader then add cellContent to columnName
+                    if (isHeader) this.#columnName.push(this.#formatString(cellContent.slice(0, -1)));
+
+                    // Reset for the next cell
+                    startByteOffset += Buffer.byteLength(cellContent) ; // Update start for next cell
+                    cellContent = ''
+                    //console.log("start: ", startByteOffset);
+                    continue;
+                }
+
+            }
+
+            // Handle Final cell of row
+            cellOffsets.push({ start: startByteOffset, end: startByteOffset + Buffer.byteLength(cellContent, 'utf8') - 1 });
+            if (isHeader) this.#columnName.push(this.#formatString(cellContent));
+
+            // Push the index for this line with offsets for each cell
+            if (!isHeader) {
+                index.push({
+                    lineOffset: byteOffset, // Starting byte offset of the line
+                    cellOffsets: cellOffsets // Start and end offsets for each cell in the line
+                });
+            }
+
+            isHeader = false;
+            
+
+            // Update for the next line (+1 for newline)
+            byteOffset += Buffer.byteLength(line, 'utf8') + 2;
         }
-
+        //console.log(JSON.stringify(index, null, 2));
+        this.#size.row = index.length;
+        this.#size.column = this.#columnName.length;
         return index;
     }
 
     /**
      * Reads a specific cell from a CSV file by line and column index, using pre-built byte offsets.
      *
-     * @param {number} lineNumber - The 0-based line number of the desired cell.
+     * @param {number} rowNumber - The 0-based line number of the desired cell.
      * @param {number} columnNumber - The 0-based column number within the line.
      * @returns {Promise<string>} - A promise that resolves to the content of the specified cell, trimmed of whitespace.
      */
-    async readSpecificCell(lineNumber, columnNumber) {
-        const { lineOffset, columnOffsets } = this.offset_index[lineNumber];
+    async getCell(rowNumber, columnNumber) {
+        if (rowNumber < 0 || rowNumber >= this.#size.row || columnNumber < 0 || columnNumber >= this.#size.column) throw new Error("Out of Range");
 
-        // Create a readable stream starting from the byte offset of the specified line
-        const fileStream = fs.createReadStream(this.file_path, { start: lineOffset });
-        const rl = readline.createInterface({ input: fileStream });
+        const { lineOffset, cellOffsets } = this.#tableOffsetIndex[rowNumber];
 
-        for await (const line of rl) {
-            // Calculate the byte offset for the specified column within the line
-            const columnByteOffset = columnOffsets[columnNumber];
+        return new Promise((resolve, reject) => {
+            let data = '';
 
-            // Determine the end byte offset for the column data
-            const columnEndByteOffset = columnNumber < columnOffsets.length - 1
-                ? columnOffsets[columnNumber + 1] // Offset for the next column
-                : line.length; // End of the line if it's the last column
+            // Create a readable stream starting from the byte offset of the specified line
+            const fileStream = fs.createReadStream(this.#filePath, { start: cellOffsets[columnNumber].start, end: cellOffsets[columnNumber].end});
 
-            // Extract the specific cell data based on byte offsets and trim whitespace
-            const cellData = line.slice(columnByteOffset - lineOffset, columnEndByteOffset - lineOffset);
-            return cellData.trim(); // Return the cell data
-        }
+            fileStream.setEncoding('utf8'); // Set encoding to UTF-8 for string data
+
+            // Collect data chunks
+            fileStream.on('data', (chunk) => {
+                data += chunk;
+            });
+
+            // Resolve the promise with the collected string when the stream ends
+            fileStream.on('end', () => {
+                // Format string in CSV to normal string
+                data = this.#formatString(data);
+
+                resolve(data); // Return the accumulated string
+            });
+
+            // Handle any errors
+            fileStream.on('error', (error) => {
+                reject(error);
+            });
+        });
     }
 
+    /**
+     * Search for a substring in cell
+     *
+     * @param {string} substring The substring that need to be search in cell.
+     * @param {number} rowNumber - The 0-based line number of the desired cell.
+     * @param {number} columnNumber - The 0-based column number within the line.
+     * @returns {Promise<Array<number>>} - A promise that resolves to the content of the specified cell, trimmed of whitespace.
+     */
+    async searchMatchInCell(substring, rowNumber, columnNumber) {
+        if (rowNumber < 0 || rowNumber >= this.#size.row || columnNumber < 0 || columnNumber >= this.#size.column) throw new Error("Out of Range");
+
+        const { lineOffset, cellOffsets } = this.#tableOffsetIndex[rowNumber];
+
+        return new Promise((resolve, reject) => {
+            const chunks = [];
+
+            // Create a readable stream starting from the byte offset of the specified line
+            const fileStream = fs.createReadStream(this.#filePath, { start: cellOffsets[columnNumber].start, end: cellOffsets[columnNumber].end });
+
+            // Collect data chunks
+            fileStream.on('data', (chunk) => {
+                chunks.push(chunk); // Buffer chunks are stored incrementally
+            });
+
+            // Resolve the promise with the collected string when the stream ends
+            fileStream.on('end', () => {
+                const data = Buffer.concat(chunks);
+                if (data.toString('utf-8').indexOf(substring) === -1) resolve(false);
+                resolve(true); // Return the accumulated string
+            });
+
+            // Handle any errors
+            fileStream.on('error', (error) => {
+                reject(error);
+            });
+        });
+    }
+
+    /**
+     * Search for a substring in cell
+     *
+     * @param {string} substring The substring that need to be search in cell.
+     * @param {number} rowNumber - The 0-based line number of the desired cell.
+     * @param {number} columnNumber - The 0-based column number within the line.
+     * @returns {Promise<Array<number>>} - A promise that resolves to the content of the specified cell, trimmed of whitespace.
+     */
+    async searchInCell(substring, rowNumber, columnNumber) {
+        if (rowNumber < 0 || rowNumber >= this.#size.row || columnNumber < 0 || columnNumber >= this.#size.column) throw new Error("Out of Range");
+
+        const { lineOffset, cellOffsets } = this.#tableOffsetIndex[rowNumber];
+
+        return new Promise((resolve, reject) => {
+            let data = '';
+
+            // Create a readable stream starting from the byte offset of the specified line
+            const fileStream = fs.createReadStream(this.#filePath, { start: cellOffsets[columnNumber].start, end: cellOffsets[columnNumber].end });
+
+            fileStream.setEncoding('utf8'); // Set encoding to UTF-8 for string data
+
+            // Collect data chunks
+            fileStream.on('data', (chunk) => {
+                data += chunk;
+            });
+
+            // Resolve the promise with the collected string when the stream ends
+            fileStream.on('end', () => {
+                // Format string in CSV to normal string
+                data = this.#formatString(data);
+                resolve(this.#findAllIndices(data, substring)); // Return the accumulated string
+            });
+
+            // Handle any errors
+            fileStream.on('error', (error) => {
+                reject(error);
+            });
+        });
+    }
+
+    /**
+     * Reads a specific row from a CSV file by line and column index, using pre-built byte offsets.
+     *
+     * @param {string} substring The substring that need to be search in cell.
+     * @param {number} rowNumber - The 0-based line number of the desired cell.
+     * @returns {Promise<any>} - A promise that resolves to the content of the specified cell, trimmed of whitespace.
+     */
+    async searchInRow(substring, rowNumber) {
+        if (rowNumber < 0 || rowNumber >= this.#size.row) throw new Error("Out of Range");
+        // Retrieve the offsets for the specified line
+        //console.log("Search In Row is running");
+        return new Promise(async (resolve, reject) => {
+            let data = {};
+            //console.log("Data", data, " - Row length: ", this.table[rowNumber].cellOffsets.length);
+            for (let i in this.#tableOffsetIndex[rowNumber].cellOffsets) {
+                //console.log(i , "=");
+                this.searchInCell(substring, rowNumber, i)
+                    .then((content) => {
+                        //console.log(content);
+                        if (content.length != 0) data[i] = content;
+                        
+                    }).catch((error) => {
+                        reject(error);
+                    });
+            }
+
+            resolve(data); // Return the accumulated string
+            
+        });
+    }
+
+    /**
+     * Search for a substr in a Row at Column
+     *
+     * @param {string} substring The substring that need to be search in cell.
+     * @param {number} rowNumber - The 0-based line number of the desired cell.
+     * @returns {Promise<any>} - A promise that resolves to the content of the specified cell, trimmed of whitespace.
+     */
+    async searchInRowAtColumn(substring, rowNumber, columnId) {
+        if (rowNumber < 0 || rowNumber >= this.#size.row) throw new Error("Out of Range");
+        // Retrieve the offsets for the specified line
+        //console.log("Search In Row is running");
+        return new Promise(async (resolve, reject) => {
+            let data = {};
+            //console.log("Data", data, " - Row length: ", this.table[rowNumber].cellOffsets.length);
+            await this.searchInCell(substring, rowNumber, columnId)
+                .then((content) => {
+                    //console.log(content);
+                    if (content.length != 0) data[columnId] = content;
+
+                }).catch((error) => {
+                    reject(error);
+                });
+
+            resolve(data); // Return the accumulated string
+
+        });
+    }
+
+    /**
+     * Search for substring Row
+     *
+     * @param {number} rowNumber - The 0-based line number of the desired cell.
+     * @returns {Promise<string>} - A promise that resolves to the content of the specified cell, trimmed of whitespace.
+     */
+    async getRow(rowNumber) {
+        if (rowNumber < 0 || rowNumber >= this.#size.row) throw new Error("Out of Range");
+        // Retrieve the offsets for the specified line
+        return new Promise(async (resolve, reject) => {
+            let data = [];
+            //console.log("Data", data, " - Row length: ", this.table[rowNumber].cellOffsets.length);
+            for (let i in this.#tableOffsetIndex[rowNumber].cellOffsets) {
+                //console.log(i , "=");
+                await this.getCell(rowNumber, i)
+                    .then((content) => {
+                        //console.log(content);
+                        data.push(content);
+                    }).catch((error) => {
+                        reject(error);
+                    });
+            }
+
+            resolve(data); // Return the accumulated string
+
+        });
+    }
+
+    /**
+     * Reads a specific rows by Range from a CSV file by line and column index, using pre-built byte offsets.
+     *
+     * @param {number} rowNumberArr - The 0-based line number of the desired cell.
+     * @returns {Promise<string>} - A promise that resolves to the content of the specified cell, trimmed of whitespace.
+     */
+    async getRowsRange(fromId, toId) {
+        if (fromId > toId) throw new Error("Invalid range");
+        if (fromId < 0 || fromId >= this.#size.row || toId < 0 || toId >= this.#size.row) throw new Error("Out of Range");
+        return new Promise(async (resolve, reject) => {
+            let data = [];
+            for (let i = fromId; i <= toId; i++ ) {
+                await this.getRow(i)
+                    .then((content) => {
+                        data.push(content);
+                    }).catch((error) => {
+                        reject(error);
+                    });
+            }
+
+            resolve(data); // Return the accumulated string
+
+        });
+    }
+
+    /**
+     * search In RowRange
+     *
+     * @param {number} rowNumberArr - The 0-based line number of the desired cell.
+     * @returns {Promise<string>} - A promise that resolves to the content of the specified cell, trimmed of whitespace.
+     */
+    async searchInRowsRange(search, fromId, toId) {
+        if (fromId > toId) throw new Error("Invalid range");
+        if (fromId < 0 || fromId >= this.#size.row || toId < 0 || toId >= this.#size.row) throw new Error("Out of Range");
+        //console.log("Search In Row Range is running");
+        return new Promise(async (resolve, reject) => {
+            let data = {};
+            for (let i = fromId; i <= toId; i++) {
+                await this.searchInRow(search, i)
+                    .then((content) => {
+                        //console.log("Search Res: ", content);
+                        if (JSON.stringify(content) != '{}') data[i] = content;
+                    }).catch((error) => {
+                        reject(error);
+                    });
+            }
+
+            resolve(data); // Return the accumulated string
+
+        });
+    }
+
+    /**
+     * search In RowRange At Column
+     *
+     * @param {number} rowNumberArr - The 0-based line number of the desired cell.
+     * @returns {Promise<string>} - A promise that resolves to the content of the specified cell, trimmed of whitespace.
+     */
+    async searchInRowsRangeAtColumn(search, fromId, toId, columnId) {
+        if (fromId > toId) throw new Error("Invalid range");
+        if (fromId < 0 || fromId >= this.#size.row || toId < 0 || toId >= this.#size.row) throw new Error("Out of Range");
+        //console.log("Search In Row Range is running");
+        return new Promise(async (resolve, reject) => {
+            let data = {};
+            for (let i = fromId; i <= toId; i++) {
+                this.searchInCell(search, i, columnId)
+                    .then((content) => {
+                        //console.log("Search Res: ", content);
+                        if (content.length != 0) data[i] = content;
+                    }).catch((error) => {
+                        reject(error);
+                    });
+            }
+
+            resolve(data); // Return the accumulated string
+
+        });
+    }
+
+    /**
+     * search In RowRange At Column
+     *
+     * @param {number} rowNumberArr - The 0-based line number of the desired cell.
+     * @returns {Promise<string>} - A promise that resolves to the content of the specified cell, trimmed of whitespace.
+     */
+    async searchMatchInRowsRangeAtColumn(search, fromId, toId, columnId) {
+        if (fromId > toId) throw new Error("Invalid range");
+        if (fromId < 0 || fromId >= this.#size.row || toId < 0 || toId >= this.#size.row) throw new Error("Out of Range");
+        //console.log("Search In Row Range is running");
+        return new Promise(async (resolve, reject) => {
+            const { default: pLimit } = await import('p-limit');  // Dynamically import p-limit
+            const limit = pLimit(10);  // Set the maximum concurrent promises
+
+            // Now, you can safely use limit
+            const promises = [];
+            const data = [];
+
+            for (let i = fromId; i <= toId; i++) {
+                // Limit the number of concurrent executions
+                const promise = limit(() => this.searchMatchInCell(search, i, columnId)
+                    .then((match) => {
+                        if (match) data.push(i);
+                    })
+                );
+                promises.push(promise);
+            }
+
+            // Wait for all promises to complete
+            Promise.all(promises)
+                .then(() => resolve(data))
+                .catch((error) => reject(error));
+
+        });
+    }
+
+    /**
+     * Get file direactory
+     * 
+     * @returns {string} file directory
+     */
+    getFileDir() {
+        return this.#filePath;
+    }
+
+    /**
+     * Get column names
+     * 
+     * @returns {Array<string>} array of column's name
+     */
+    getColumnName() {
+        return this.#columnName;
+    }
+
+    
 }
 
-module.exports = User;
+module.exports = File;
