@@ -98,6 +98,7 @@ class Database {
         if (fileId >= Database.#files.length) return null;
         return Database.#files[fileId];
     }
+
 }
 
 // Export

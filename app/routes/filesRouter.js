@@ -4,6 +4,7 @@ const filesController = require('../controllers/filesController');
 
 // Routes
 router.get('/fileDir', filesController.getFileDir);
+router.get('/:fileId/search', filesController.search);
 router.get('/:fileId/cell', filesController.getCell);
 router.get('/:fileId/cell/search', filesController.searchInCell);
 router.get('/:fileId/row/:rowId', filesController.getRow);

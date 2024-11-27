@@ -1,5 +1,19 @@
+const BPlusTree = require('../models/BPlusTree');
 const fs = require('fs');
 const readline = require('readline');
+
+function parseDate(dateTimeStr) {
+    // Split the date and time parts
+    const [datePart] = dateTimeStr.split('_');
+
+    // Parse the date part
+    const [day, month, year] = datePart.split('/').map(Number);
+
+    // Create a new Date object
+    const date = new Date(year, month - 1, day);
+
+    return date;
+}
 
 class File {
 
@@ -12,6 +26,9 @@ class File {
         this.#filePath = filePath;
         // Initialize offset_index using the async method
         this.#tableOffsetIndex = this.#initialize(); // This will be a promise
+        this.dateTimeTree = new BPlusTree();
+        this.creditTree = new BPlusTree();
+        this.debitTree = new BPlusTree();
     }
 
     async #initialize() {
@@ -61,7 +78,11 @@ class File {
 
         let byteOffset = 0;
         let isHeader = true;
+        let row = -2;
         for await (const line of rl) {
+            let col = 0;
+            row += 1;
+
             const cellOffsets = [];
             let inQuotes = false;
             let startByteOffset = byteOffset; // Track the starting byte offset for the line
@@ -87,11 +108,34 @@ class File {
                     //console.log("end: ", endByteOffset, " - ByteOffset: ", byteOffset, " - startByteOffset: ", startByteOffset, "- cellLenght: ", Buffer.byteLength(cellContent));
                     cellOffsets.push({ start: startByteOffset, end: endByteOffset });
 
+                    
+
                     // If isHeader then add cellContent to columnName
                     if (isHeader) this.#columnName.push(this.#formatString(cellContent.slice(0, -1)));
 
                     // Reset for the next cell
                     startByteOffset += Buffer.byteLength(cellContent) ; // Update start for next cell
+                    if (!isHeader) {
+                        console.log("Data: ", cellContent);
+                        if (col == 0) {
+                            let key = parseDate(cellContent);
+                            console.log("Date: ", key, row);
+                            let value = row;
+                            this.dateTimeTree.insert(key, value);
+                        } else if (col == 2) {
+                            let key = parseInt(cellContent, 10);
+                            console.log("Credit: ", key, row);
+                            let value = row;
+                            this.creditTree.insert(key, value);
+                        } else if (col == 3) {
+                            let key = parseInt(cellContent, 10);
+                            console.log("Debit: ", key, row);
+                            let value = row;
+                            this.debitTree.insert(key, value);
+                        }
+
+                        col += 1;
+                    }
                     cellContent = ''
                     //console.log("start: ", startByteOffset);
                     continue;
@@ -353,6 +397,24 @@ class File {
         });
     }
 
+    async getRows(rowIds) {
+        return new Promise(async (resolve, reject) => {
+            let data = [];
+            for (const i of rowIds) {
+                await this.getRow(i)
+                    .then((content) => {
+                        
+                        data.push(content);
+                    }).catch((error) => {
+                        reject(error);
+                    });
+            }
+            console.log(data);
+            resolve(data); // Return the accumulated string
+
+        });
+    }
+
     /**
      * search In RowRange
      *
@@ -461,7 +523,16 @@ class File {
         return this.#columnName;
     }
 
-    
+    searchCredit(credit) {
+        //console.log(credit);
+        return this.creditTree.search(credit);
+    }
+
+    searchTime(time) {
+        console.log(time);
+        return this.dateTimeTree.search(time);
+    }
+
 }
 
 module.exports = File;

@@ -1,5 +1,18 @@
 const Database = require('../config/db');
 
+function parseDate(dateTimeStr) {
+    // Split the date and time parts
+    const [datePart] = dateTimeStr.split('_');
+
+    // Parse the date part
+    const [day, month, year] = datePart.split('/').map(Number);
+
+    // Create a new Date object
+    const date = new Date(year, month - 1, day);
+
+    return date;
+}
+
 // Get file's directory
 exports.getFileDir = async (req, res) => {
     const { fileId } = req.query;
@@ -200,6 +213,27 @@ exports.getColumnName = async (req, res) => {
     if (file) {
         res.status(200).json({
             columnName: file.getColumnName()
+        });
+    }
+    else {
+        console.error('Error reading file: Out of range');
+        res.status(400).json({
+            success: false,
+            message: "Resource not found"
+        })
+    }
+};
+
+// Search
+exports.search = async (req, res) => {
+    const { fileId } = req.params;
+    const { credit, time } = req.query;
+    let file = Database.getFile(fileId);
+    let row_credit_Ids = await file.searchCredit(parseInt(credit, 10));
+    let row_time_Ids = await file.searchTime(parseDate(time));
+    if (file) {
+        res.status(200).json({
+            row_data: await file.getRows(row_time_Ids)
         });
     }
     else {
