@@ -20,6 +20,7 @@ var logger = require('morgan');
 
 // Require Routers
 var indexRouter = require('./routes/index');
+var searchRouter = require('./routes/searchRouter');
 var filesRouter = require('./routes/filesRouter');
 var databaseRouter = require('./routes/databaseRouter');
 var BPlusTreeRouter = require('./routes/BPlusTreeRouter');
@@ -43,6 +44,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Register Routers
 app.use('/', indexRouter);
+app.use('/search', searchRouter);
 app.use('/files', filesRouter);
 app.use('/database', databaseRouter);
 app.use('/testbtree', BPlusTreeRouter);

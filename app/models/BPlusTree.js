@@ -28,15 +28,18 @@ class BPlusTreeNode {
     }
 
     isFull() {
+        //console.log(this.keys.length >= this.order - 1);
         return this.keys.length >= this.order - 1; // Số key tối đa = order - 1
     }
 }
 
 class BPlusTree {
     constructor(order) {
+        /*
         if (order < 3) {
             throw new Error("Order phải lớn hơn hoặc bằng 3.");
         }
+        */
         this.order = order;
         this.root = new BPlusTreeNode(order, true); // Bắt đầu với một node leaf rỗng
     }
@@ -57,6 +60,7 @@ class BPlusTree {
     }
 
     insertNonFull(node, key, value) {
+        //console.log("Insert: ", "key - ", key, ", value - ", value, ", isLeaf root: ", this.root.isLeaf);
         if (node.isLeaf) {
             // Tìm vị trí insert
             const index = this.findInsertPosition(node.keys, key);
@@ -71,7 +75,7 @@ class BPlusTree {
             }
         } else {
             // Tìm con phù hợp để chèn
-            const index = this.findInsertPosition(node.keys, key);
+            let index = this.findInsertPosition(node.keys, key);
 
             if (node.children[index].isFull()) {
                 // Nếu con đầy, split trước khi chèn
@@ -89,6 +93,7 @@ class BPlusTree {
     splitChild(parent, index) {
         const nodeToSplit = parent.children[index];
         const midIndex = Math.floor((this.order - 1) / 2);
+        //console.log(midIndex, this.order);
 
         // Tạo node mới cho phần bên phải
         const newNode = new BPlusTreeNode(this.order, nodeToSplit.isLeaf);
@@ -122,10 +127,15 @@ class BPlusTree {
 
     search(key) {
         let node = this.root;
-
+        //console.log("Key = ", key);
         // Traverse until we reach a leaf node
+        let i = 0;
+        //console.log("Count: ", i);
         while (!node.isLeaf) {
+            i += 1;
+            //console.log("Count: ", i);
             let i = this.findInsertPosition(node.keys, key);
+            //console.log("Find Insert Position", i);
             node = node.children[i];
         }
 
@@ -135,8 +145,42 @@ class BPlusTree {
             return node.children[index]; // Return all values for the key
         }
 
-        return null; // Key not found
+        return []; // Key not found
     }
+
+    rangeSearch(startKey, endKey) {
+        let node = this.root;
+
+        // Traverse until we reach a leaf node
+        while (!node.isLeaf) {
+            let i = this.findInsertPosition(node.keys, startKey);
+            node = node.children[i];
+        }
+
+        // At a leaf node, find the starting key
+        let index = this.findInsertPosition(node.keys, startKey);
+        let results = [];
+
+        // Collect all keys and values within the range
+        while (node) {
+            while (index < node.keys.length && node.keys[index] <= endKey) {
+                if (node.keys[index] >= startKey) {
+                    results.push(node.children[index]);
+                }
+                index++;
+            }
+            // Check if node.children is defined and has elements before moving to the next leaf node
+            if (node.children && node.children.length > 0) {
+                node = node.children[node.children.length - 1]; // Move to the next leaf node
+                index = 0; // Reset index for the new node
+            } else {
+                break; // Exit the loop if there are no more children
+            }
+        }
+
+        return results.flat(); // Flatten the results
+    }
+
 
     // Hàm in cây (debug)
     print(node = this.root, level = 0) {
