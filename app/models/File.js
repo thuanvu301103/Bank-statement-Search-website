@@ -1,4 +1,5 @@
 const BPlusTree = require('../models/BPlusTree');
+const AVLTree = require('../models/AVLTree');
 const TrieTree = require('../models/TrieTree');
 const fs = require('fs');
 const readline = require('readline');
@@ -29,9 +30,12 @@ class File {
         this.#filePath = filePath;
         // Initialize offset_index using the async method
         this.#tableOffsetIndex = this.#initialize(); // This will be a promise
-        this.dateTimeTree = new BPlusTree();
-        this.creditTree = new BPlusTree();
-        this.debitTree = new BPlusTree();
+        //this.dateTimeTree = new BPlusTree();
+        this.dateTimeTree = new AVLTree();
+        //this.creditTree = new BPlusTree();
+        this.creditTree = new AVLTree();
+        //this.debitTree = new BPlusTree();
+        this.debitTree = new AVLTree();
         this.detailTree = new TrieTree();
     }
 
@@ -127,17 +131,20 @@ class File {
                             let key = await parseDate(cellContent);
                             //console.log("Date: ", key, row);
                             let value = row;
-                            this.dateTimeTree.insert(key, value);
+                            //this.dateTimeTree.insert(key, value);
+                            this.dateTimeTree.insertKeyValue(key, value);
                         } else if (col == 2) {
                             let key = parseInt(cellContent.replace(/"/g, ''), 10);
                             //console.log("Credit: ", key, row);
                             let value = row;
-                            this.creditTree.insert(key, value);
+                            this.creditTree.insertKeyValue(key, value);
+                            //this.creditTree.insert(key, value);
                         } else if (col == 3) {
                             let key = parseInt(cellContent.replace(/"/g, ''), 10);
                             //console.log("Debit: ", key, row);
                             let value = row;
-                            this.debitTree.insert(key, value);
+                            this.debitTree.insertKeyValue(key, value);
+                            //this.debitTree.insert(key, value);
                         } 
 
                         col += 1;
@@ -156,9 +163,9 @@ class File {
             // Push the index for this line with offsets for each cell
             if (!isHeader) {
                 //console.log(cellContent);
-                let key = cellContent;
-                let value = row;
-                this.detailTree.insert(key, value);
+                //let key = cellContent;
+                //let value = row;
+                //this.detailTree.insert(key, value);
                 index.push({
                     lineOffset: byteOffset, // Starting byte offset of the line
                     cellOffsets: cellOffsets // Start and end offsets for each cell in the line
@@ -535,32 +542,38 @@ class File {
 
     searchCredit(credit) {
         //console.log(credit);
-        return this.creditTree.search(credit);
+        //return this.creditTree.search(credit);
+        return this.creditTree.searchKey(credit);
     }
 
     rangeSearchCredit(startCredit, endCredit) {
-        return this.creditTree.rangeSearch(startCredit, endCredit);
+        //return this.creditTree.rangeSearch(startCredit, endCredit);
+        return this.creditTree.rangeSearchKeys(startCredit, endCredit);
     }
 
     searchDebit(debit) {
         //console.log(credit);
-        return this.debitTree.search(debit);
+        //return this.debitTree.search(debit);
+        return this.debitTree.searchKey(debit);
     }
 
     rangeSearchDebit(startDebit, endDebit) {
-        return this.creditTree.rangeSearch(startDebit, endDebit);
+        //return this.creditTree.rangeSearch(startDebit, endDebit);
+        return this.debitTree.rangeSearchKeys(startDebit, endDebit);
     }
 
     searchTime(time) {
-        return this.dateTimeTree.search(time);
+        //return this.dateTimeTree.search(time);
+        return this.dateTimeTree.searchKey(time)
     }
 
     rangeSearchTime(startTime, endTime) {
-        return this.dateTimeTree.rangeSearch(startTime, endTime);
+        //return this.dateTimeTree.rangeSearch(startTime, endTime);
+        return this.dateTimeTree.rangeSearchKeys(startTime, endTime);
     }
 
     searchDetail(detail) {
-        console.log("Search by Detail: ", detail);
+        //console.log("Search by Detail: ", detail);
         return this.detailTree.search(detail);
     }
 }
