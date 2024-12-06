@@ -1,8 +1,8 @@
 ﻿function cleanString(str) {
     // Xóa tất cả các dấu câu
-    let cleanedStr = str.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, ' ');
+    let cleanedStr = str.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()'"]/g, ' ');
     // Chuyển đổi chữ thành chữ thường
-    cleanedStr = cleanedStr.toLowerCase();
+    cleanedStr = cleanedStr.toLowerCase().trim();
     return cleanedStr;
 }
 
@@ -20,17 +20,25 @@ class TrieTree {
 
     insert(sentence, transaction) {
         const words = cleanString(sentence).split(' ').filter(word => word.length > 0);
-        for (let i = 0; i < words.length; i++) {
+        //for (let i = 0; i < words.length; i++) {
             let node = this.root;
-            for (let j = i; j < words.length; j++) {
+            //for (let j = i; j < words.length; j++) {
+            for (let j = 0; j < words.length; j++) {
                 const word = words[j];
                 if (!node.children[word]) {
-                    node.children[word] = new TrieNode();
+                    if (!this.root.children[word])
+                        node.children[word] = new TrieNode();
+                    else
+                        node.children[word] = this.root.children[word];
                 }
                 node = node.children[word];
                 node.sentences.push(transaction);
+                if (!this.root.children[word]) {
+                    this.root.children[word] = node;
+                    //this.root.children[word].sentences.push(transaction);
+                }
             }
-        }
+        //}
     }
 
     search(substring) {

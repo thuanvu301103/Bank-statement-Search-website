@@ -74,53 +74,100 @@ class AVLTree {
         return y; // New root
     }
 
-    // Insert key-value pair into the AVL Tree
-    insert(root, key, value) {
-        // Perform normal BST insert
-        if (!root) return new AVLNode(key, value);
-
-        if (key < root.key) {
-            root.left = this.insert(root.left, key, value);
-        } else if (key > root.key) {
-            root.right = this.insert(root.right, key, value);
-        } else {
-            // If the key already exists, add the value to the values array
-            root.values.push(value);
-            return root;
+    // Insert key-value pair into the AVL Tree using iteration
+    insert(key, value) {
+        let node = new AVLNode(key, value);
+        if (!this.root) {
+            this.root = node;
+            return;
         }
 
-        // Update height of this ancestor node
-        root.height = Math.max(this.getHeight(root.left), this.getHeight(root.right)) + 1;
+        let current = this.root;
+        let stack = [];
 
-        // Get balance factor
-        const balance = this.getBalanceFactor(root);
+        while (true) {
+            stack.push(current);
 
-        // Rotate if unbalanced
-        // Left Left Case
-        if (balance > 1 && key < root.left.key) {
-            return this.rotateRight(root);
-        }
-        // Right Right Case
-        if (balance < -1 && key > root.right.key) {
-            return this.rotateLeft(root);
-        }
-        // Left Right Case
-        if (balance > 1 && key > root.left.key) {
-            root.left = this.rotateLeft(root.left);
-            return this.rotateRight(root);
-        }
-        // Right Left Case
-        if (balance < -1 && key < root.right.key) {
-            root.right = this.rotateRight(root.right);
-            return this.rotateLeft(root);
+            if (key < current.key) {
+                if (!current.left) {
+                    current.left = node;
+                    break;
+                }
+                current = current.left;
+            } else if (key > current.key) {
+                if (!current.right) {
+                    current.right = node;
+                    break;
+                }
+                current = current.right;
+            } else {
+                // If the key already exists, add the value to the values array
+                current.values.push(value);
+                return;
+            }
         }
 
-        return root; // Return unchanged root
+        // Update heights and balance the tree
+        while (stack.length > 0) {
+            let parent = stack.pop();
+            parent.height = Math.max(this.getHeight(parent.left), this.getHeight(parent.right)) + 1;
+
+            let balance = this.getBalanceFactor(parent);
+
+            // Rotate if unbalanced
+            if (balance > 1 && key < parent.left.key) {
+                if (stack.length > 0) {
+                    let grandparent = stack[stack.length - 1];
+                    if (grandparent.left === parent) {
+                        grandparent.left = this.rotateRight(parent);
+                    } else {
+                        grandparent.right = this.rotateRight(parent);
+                    }
+                } else {
+                    this.root = this.rotateRight(parent);
+                }
+            } else if (balance < -1 && key > parent.right.key) {
+                if (stack.length > 0) {
+                    let grandparent = stack[stack.length - 1];
+                    if (grandparent.left === parent) {
+                        grandparent.left = this.rotateLeft(parent);
+                    } else {
+                        grandparent.right = this.rotateLeft(parent);
+                    }
+                } else {
+                    this.root = this.rotateLeft(parent);
+                }
+            } else if (balance > 1 && key > parent.left.key) {
+                parent.left = this.rotateLeft(parent.left);
+                if (stack.length > 0) {
+                    let grandparent = stack[stack.length - 1];
+                    if (grandparent.left === parent) {
+                        grandparent.left = this.rotateRight(parent);
+                    } else {
+                        grandparent.right = this.rotateRight(parent);
+                    }
+                } else {
+                    this.root = this.rotateRight(parent);
+                }
+            } else if (balance < -1 && key < parent.right.key) {
+                parent.right = this.rotateRight(parent.right);
+                if (stack.length > 0) {
+                    let grandparent = stack[stack.length - 1];
+                    if (grandparent.left === parent) {
+                        grandparent.left = this.rotateLeft(parent);
+                    } else {
+                        grandparent.right = this.rotateLeft(parent);
+                    }
+                } else {
+                    this.root = this.rotateLeft(parent);
+                }
+            }
+        }
     }
 
     // Public method to insert a key-value pair
     insertKeyValue(key, value) {
-        this.root = this.insert(this.root, key, value);
+        this.insert(key, value);
     }
 
     // Search for a key and return its values
@@ -137,22 +184,33 @@ class AVLTree {
     }
 
     // Range search: Find all values in the range [minKey, maxKey]
-    rangeSearch(root, minKey, maxKey, result = []) {
-        if (!root) return result;
+    rangeSearch(root, minKey, maxKey) {
+        let result = [];
+        let stack = [];
+        let current = root;
 
-        // Traverse left subtree if there's a chance of smaller keys in range
-        if (minKey < root.key) {
-            this.rangeSearch(root.left, minKey, maxKey, result);
-        }
+        while (stack.length > 0 || current !== null) {
+            // Traverse left subtree if there's a chance of smaller keys in range
+            while (current !== null) {
+                stack.push(current);
+                current = current.left;
+            }
 
-        // Add node values if the key is within range
-        if ((minKey < root.key || isEqual(minKey, root.key)) && (root.key < maxKey || isEqual(maxKey, root.key))) {
-            result.push(...root.values);
-        }
+            current = stack.pop();
 
-        // Traverse right subtree if there's a chance of larger keys in range
-        if (maxKey > root.key) {
-            this.rangeSearch(root.right, minKey, maxKey, result);
+            // Add node values if the key is within range
+            if ((minKey < current.key || isEqual(minKey, current.key)) && (current.key < maxKey || isEqual(maxKey, current.key))) {
+                //console.log(current.key);
+                //console.log(current.values)
+                result = result.concat(current.values);
+            }
+
+            // Traverse right subtree if there's a chance of larger keys in range
+            if (current.key < maxKey) {
+                current = current.right;
+            } else {
+                current = null;
+            }
         }
 
         return result;

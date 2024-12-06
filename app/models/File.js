@@ -163,9 +163,9 @@ class File {
             // Push the index for this line with offsets for each cell
             if (!isHeader) {
                 //console.log(cellContent);
-                //let key = cellContent;
-                //let value = row;
-                //this.detailTree.insert(key, value);
+                let key = cellContent;
+                let value = row;
+                this.detailTree.insert(key, value);
                 index.push({
                     lineOffset: byteOffset, // Starting byte offset of the line
                     cellOffsets: cellOffsets // Start and end offsets for each cell in the line
