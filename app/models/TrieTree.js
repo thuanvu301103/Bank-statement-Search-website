@@ -6,6 +6,11 @@
     return cleanedStr;
 }
 
+function intersection(arrays) {
+    if (arrays.length === 0) return [];
+    return arrays.reduce((acc, array) => acc.filter(value => array.includes(value)));
+}
+
 class TrieNode {
     constructor() {
         this.children = {};
@@ -32,7 +37,8 @@ class TrieTree {
                         node.children[word] = this.root.children[word];
                 }
                 node = node.children[word];
-                node.sentences.push(transaction);
+                //if (!node.sentences.includes(transaction))
+                    node.sentences.push(transaction);
                 if (!this.root.children[word]) {
                     this.root.children[word] = node;
                     //this.root.children[word].sentences.push(transaction);
@@ -43,16 +49,22 @@ class TrieTree {
 
     search(substring) {
         const words = cleanString(substring).split(' ').filter(word => word.length > 0);
-        console.log(words);
+        //console.log(words);
         let node = this.root;
+        let res = [];
         for (const word of words) {
             if (!node.children[word]) {
                 console.log("Not found word!");
                 return [];
             }
             node = node.children[word];
+            if (res.length === 0)
+                res = node.sentences;
+            else
+                res = intersection([res, node.sentences]);
         }
-        return node.sentences;
+        //return node.sentences;
+        return res;
     }
 }
 
