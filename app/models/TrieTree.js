@@ -26,24 +26,24 @@ class TrieTree {
     insert(sentence, transaction) {
         const words = cleanString(sentence).split(' ').filter(word => word.length > 0);
         //for (let i = 0; i < words.length; i++) {
-            let node = this.root;
-            //for (let j = i; j < words.length; j++) {
-            for (let j = 0; j < words.length; j++) {
-                const word = words[j];
-                if (!node.children[word]) {
-                    if (!this.root.children[word])
-                        node.children[word] = new TrieNode();
-                    else
-                        node.children[word] = this.root.children[word];
-                }
-                node = node.children[word];
-                //if (!node.sentences.includes(transaction))
-                    node.sentences.push(transaction);
-                if (!this.root.children[word]) {
-                    this.root.children[word] = node;
-                    //this.root.children[word].sentences.push(transaction);
-                }
+        let node = this.root;
+        //for (let j = i; j < words.length; j++) {
+        for (let j = 0; j < words.length; j++) {
+            const word = words[j];
+            if (!node.children[word]) {
+                if (!this.root.children[word])
+                    node.children[word] = new TrieNode();
+                else
+                    node.children[word] = this.root.children[word];
             }
+            node = node.children[word];
+            //if (!node.sentences.includes(transaction))
+            node.sentences.push(transaction);
+            if (!this.root.children[word]) {
+                this.root.children[word] = node;
+                //this.root.children[word].sentences.push(transaction);
+            }
+        }
         //}
     }
 

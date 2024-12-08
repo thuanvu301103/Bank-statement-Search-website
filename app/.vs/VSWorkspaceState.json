@@ -11,6 +11,6 @@
     "\\routes",
     "\\views"
   ],
-  "SelectedNode": "\\views\\index.hbs",
+  "SelectedNode": "\\views\\layout.hbs",
   "PreviewInSolutionExplorer": false
 }
