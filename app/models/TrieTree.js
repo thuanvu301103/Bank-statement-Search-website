@@ -14,7 +14,7 @@ function intersection(arrays) {
 class TrieNode {
     constructor() {
         this.children = {};
-        this.sentences = [];
+        this.sentences = {};
     }
 }
 
@@ -25,43 +25,89 @@ class TrieTree {
 
     insert(sentence, transaction) {
         const words = cleanString(sentence).split(' ').filter(word => word.length > 0);
-        //for (let i = 0; i < words.length; i++) {
-        let node = this.root;
-        //for (let j = i; j < words.length; j++) {
-        for (let j = 0; j < words.length; j++) {
-            const word = words[j];
-            if (!node.children[word]) {
-                if (!this.root.children[word])
+        /*for (let i = 0; i < words.length; i++) {
+            let node = this.root;
+            for (let j = i; j < words.length; j++) {
+                const word = words[j];
+                if (!node.children[word]) {
                     node.children[word] = new TrieNode();
-                else
-                    node.children[word] = this.root.children[word];
+                }
+                node = node.children[word];
+                node.sentences.push(transaction);
             }
-            node = node.children[word];
-            //if (!node.sentences.includes(transaction))
-            node.sentences.push(transaction);
+        }*/
+
+        let node = this.root;
+        for (let i = 0; i < words.length; i++) {
+            const word = words[i];
             if (!this.root.children[word]) {
-                this.root.children[word] = node;
-                //this.root.children[word].sentences.push(transaction);
+                this.root.children[word] = new TrieNode();
+
+            } 
+            let temp_node = this.root.children[word];
+            
+            if (temp_node.sentences[transaction] !== undefined) {
+                //temp_node.sentences[transaction] = [i];
+                //console.log(temp_node.sentences[transaction]);
+                temp_node.sentences[transaction].push(i);
+            } else {
+                //temp_node.sentences[transaction].append(i);
+                temp_node.sentences[transaction] = [i];
             }
+            //console.log(temp_node.sentences);        
+
+            if (!node.children[word]) {
+                node.children[word] = temp_node;
+            }
+            node = temp_node;
         }
-        //}
     }
 
     search(substring) {
         const words = cleanString(substring).split(' ').filter(word => word.length > 0);
-        //console.log(words);
         let node = this.root;
-        let res = [];
+        let res = null;
         for (const word of words) {
+            //console.log(word);
+            let old_node = node;
             if (!node.children[word]) {
-                console.log("Not found word!");
                 return [];
             }
             node = node.children[word];
-            if (res.length === 0)
-                res = node.sentences;
-            else
-                res = intersection([res, node.sentences]);
+            if (res === null) {
+                //console.log("Nullllll");
+
+                res = Object.keys(node.sentences);
+                //console.log(res);
+            }
+            else {
+                //console.log("Not Nullllll");
+                let new_res = [];
+                for (const sentence of res) {
+                    //console.log(sentence, res);
+                    if (node.sentences[sentence] === undefined) continue;
+                    let approve = false;
+                    for (const i of old_node.sentences[sentence]) {
+
+                        if (node.sentences[sentence].includes(i + 1)) {
+                            approve = true;
+                            
+                            break;
+                        }
+                        
+                        //console.log(old_node.sentences[sentence]);
+                        //console.log(node.sentences[sentence]);
+
+                    }
+                    if (approve) {
+                        new_res.push(sentence);
+
+                    }
+                    //console.log("New res: ", new_res);
+
+                }
+                res = new_res;
+            }
         }
         //return node.sentences;
         return res;
