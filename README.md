@@ -14,6 +14,11 @@ docker pull thuanvu301103/bank-statement-app:v1.0
 docker run -d -p 3000:3000 thuanvu301103/bank-statement-app:v1.0
 ```
 
+## Search API (for detail)
+```
+http://localhost:3000/query?q=detail search substring
+```
+
 ## Kill process (server) running on specific port:
 - Find PID of server running on port:
 	```
