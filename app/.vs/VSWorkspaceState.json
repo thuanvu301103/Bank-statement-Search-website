@@ -7,10 +7,9 @@
     "\\data",
     "\\data\\data_file",
     "\\models",
-    "\\public",
     "\\routes",
     "\\views"
   ],
-  "SelectedNode": "\\views\\layout.hbs",
+  "SelectedNode": "\\controllers\\queryController.js",
   "PreviewInSolutionExplorer": false
 }

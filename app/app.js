@@ -24,6 +24,7 @@ var searchRouter = require('./routes/searchRouter');
 var filesRouter = require('./routes/filesRouter');
 var databaseRouter = require('./routes/databaseRouter');
 var BPlusTreeRouter = require('./routes/BPlusTreeRouter');
+var queryRouter = require('./routes/queryRouter');
 
 // Site entry point
 const config = require('./config')();
@@ -48,6 +49,7 @@ app.use('/search', searchRouter);
 app.use('/files', filesRouter);
 app.use('/database', databaseRouter);
 app.use('/testbtree', BPlusTreeRouter);
+app.use('/query', queryRouter);
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
