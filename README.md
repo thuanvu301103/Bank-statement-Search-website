@@ -1,7 +1,7 @@
 # Bank-statement-Search-website
 A website that helps you search bank statements quickly
 
-## Pull Image and run container
+## Pull Image and run container via Docker Hub
 ### Pull Image from Docker Hub
 
 On Terminal, run the following command:
@@ -28,5 +28,16 @@ http://localhost:3000/query?q=detail search substring
 	```
 	taskkill /F /PID <PID>
 	```
+
+## Run container via Docker Compose
+```bash
+docker-compose up
+```
+
+Search API (for detail)
+```
+http://localhost:60301/query?q=detail search substring
+```
+
 
 

@@ -1,0 +1,7 @@
+version: '3.8'
+
+services:
+  web:  # Define a web server service
+    image: thuanvu301103/bank-statement-app:v1.0  # Use a public docker hub image
+    ports:
+      - "60301:3000"  # Map host port 8080 to container port 80
